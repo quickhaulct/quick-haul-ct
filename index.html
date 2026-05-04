@@ -565,9 +565,9 @@
       selectedFiles.push(file);
       var reader = new FileReader();
       reader.onload = function(e) {
+        var idx = selectedFiles.length - 1;
         var thumb = document.createElement('div');
         thumb.className = 'preview-thumb';
-        var idx = selectedFiles.length - 1;
         thumb.innerHTML = '<img src="' + e.target.result + '" alt="preview"/><button class="remove-btn" onclick="removeThumb(this,' + idx + ')" type="button">x</button>';
         preview.appendChild(thumb);
       };
@@ -602,7 +602,7 @@
   });
 
   /* Upload one image to Cloudinary and return a public URL */
-  function uploadToImgur(file) {
+  function uploadPhoto(file) {
     return new Promise(function(resolve, reject) {
       var formData = new FormData();
       formData.append('file', file);
@@ -616,7 +616,7 @@
         if (data.secure_url) {
           resolve(data.secure_url);
         } else {
-          reject(new Error('Upload failed: ' + JSON.stringify(data)));
+          reject(new Error('Upload failed'));
         }
       })
       .catch(reject);
@@ -636,21 +636,20 @@
     btn.disabled = true;
     errorBox.style.display = 'none';
 
-    /* Build payload from form text fields only */
+    /* Build payload from form text fields */
     var formData = new FormData(form);
     var payload = {};
     formData.forEach(function(value, key) {
       payload[key] = value;
     });
 
-    /* Upload all photos to Imgur first, then send links to Formspree */
-    var uploadPromises = selectedFiles.map(uploadToImgur);
+    /* Upload photos then submit */
+    var uploads = selectedFiles.length > 0 ? selectedFiles.map(uploadPhoto) : [Promise.resolve(null)];
 
-    Promise.all(uploadPromises).then(function(imageUrls) {
-      /* Add each image as a clickable URL in the payload */
-      if (imageUrls.length > 0) {
-        payload['photos'] = imageUrls.join('
-');
+    Promise.all(uploads).then(function(urls) {
+      var validUrls = urls.filter(function(u) { return u !== null; });
+      if (validUrls.length > 0) {
+        payload['photos'] = validUrls.join(', ');
       }
 
       btn.textContent = 'Sending...';
