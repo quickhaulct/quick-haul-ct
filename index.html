@@ -601,13 +601,25 @@
     handleFiles(e.dataTransfer.files);
   });
 
-  /* Convert image file to base64 string */
-  function toBase64(file) {
+  /* Upload one image to Cloudinary and return a public URL */
+  function uploadToImgur(file) {
     return new Promise(function(resolve, reject) {
-      var reader = new FileReader();
-      reader.onload = function() { resolve(reader.result); };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      var formData = new FormData();
+      formData.append('file', file);
+      formData.append('upload_preset', 'quickhaulct');
+      fetch('https://api.cloudinary.com/v1_1/djlbdxpai/image/upload', {
+        method: 'POST',
+        body: formData
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.secure_url) {
+          resolve(data.secure_url);
+        } else {
+          reject(new Error('Upload failed: ' + JSON.stringify(data)));
+        }
+      })
+      .catch(reject);
     });
   }
 
@@ -620,24 +632,28 @@
     var successBox = document.getElementById('formSuccess');
     var form = document.getElementById('quoteForm');
 
-    btn.textContent = 'Sending...';
+    btn.textContent = 'Uploading photos...';
     btn.disabled = true;
     errorBox.style.display = 'none';
 
-    /* Build payload from form fields (skip file input) */
+    /* Build payload from form text fields only */
     var formData = new FormData(form);
     var payload = {};
     formData.forEach(function(value, key) {
       payload[key] = value;
     });
 
-    /* Convert photos to base64 then send */
-    var photoPromises = selectedFiles.map(toBase64);
+    /* Upload all photos to Imgur first, then send links to Formspree */
+    var uploadPromises = selectedFiles.map(uploadToImgur);
 
-    Promise.all(photoPromises).then(function(base64Images) {
-      base64Images.forEach(function(b64, i) {
-        payload['photo_' + (i + 1)] = b64;
-      });
+    Promise.all(uploadPromises).then(function(imageUrls) {
+      /* Add each image as a clickable URL in the payload */
+      if (imageUrls.length > 0) {
+        payload['photos'] = imageUrls.join('
+');
+      }
+
+      btn.textContent = 'Sending...';
 
       return fetch('https://formspree.io/f/mlgzdpqj', {
         method: 'POST',
