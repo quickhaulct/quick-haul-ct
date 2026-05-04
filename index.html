@@ -690,6 +690,7 @@
 </footer>
 
 <script>
+  /* ── Scroll animations ── */<script>
   /* ── Scroll animations ── */
   const obs = new IntersectionObserver((entries)=>{
     entries.forEach(e=>{
@@ -703,6 +704,7 @@
 
   /* ── Photo upload ── */
   let selectedFiles = [];
+
   function handleFiles(files) {
     const preview = document.getElementById('previewRow');
     preview.style.display = 'flex';
@@ -721,49 +723,77 @@
     const zone = document.getElementById('uploadZone');
     zone.querySelector('.upload-text').textContent = `${selectedFiles.length} photo${selectedFiles.length>1?'s':''} attached`;
   }
+
   function removeThumb(btn, idx) {
     selectedFiles.splice(idx, 1);
     btn.closest('.preview-thumb').remove();
     const zone = document.getElementById('uploadZone');
     zone.querySelector('.upload-text').textContent = selectedFiles.length ? `${selectedFiles.length} photo${selectedFiles.length>1?'s':''} attached` : 'Click to add photos of your items';
   }
+
   const zone = document.getElementById('uploadZone');
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor='var(--orange)'; });
   zone.addEventListener('dragleave', () => { zone.style.borderColor=''; });
 
+  /* ── Convert file to base64 ── */
+  function toBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   /* ── Formspree AJAX submission ── */
-document.getElementById('quoteForm').addEventListener('submit', async function(e) {
+  document.getElementById('quoteForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
     const btn = document.getElementById('submitBtn');
     const errorBox = document.getElementById('formError');
     const successBox = document.getElementById('formSuccess');
-    const form = document.getElementById('quoteForm'); // ← store form in a variable
+    const form = document.getElementById('quoteForm');
 
     btn.textContent = 'Sending…';
     btn.disabled = true;
     errorBox.style.display = 'none';
 
-    const data = new FormData(this);
+    // Build a plain object from the form fields (no file inputs)
+    const formData = new FormData(this);
+    const payload = {};
+    formData.forEach((value, key) => {
+      if (key !== 'photos') payload[key] = value; // skip the file input
+    });
+
+    // Convert each selected photo to base64 and add as text
+    if (selectedFiles.length > 0) {
+      const base64Images = await Promise.all(selectedFiles.map(toBase64));
+      base64Images.forEach((b64, i) => {
+        payload[`photo_${i + 1}`] = b64; // sends as plain text field
+      });
+    }
 
     try {
       const res = await fetch('https://formspree.io/f/mlgzdpqj', {
         method: 'POST',
-        body: data,
-        headers: { 'Accept': 'application/json' }
+        body: JSON.stringify(payload),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
       });
 
       if (res.ok) {
-        form.style.display = 'none';        // ← use form variable instead of "this"
+        form.style.display = 'none';
         successBox.style.display = 'block';
         errorBox.style.display = 'none';
       } else {
         const json = await res.json();
-        console.error('Formspree error:', json); // ← added so you can see errors
+        console.error('Formspree error:', json);
         throw new Error(json.error || 'Submission failed');
       }
     } catch (err) {
-      console.error('Submit error:', err); // ← added so you can see errors
+      console.error('Submit error:', err);
       errorBox.style.display = 'block';
       btn.textContent = 'Send Request →';
       btn.disabled = false;
