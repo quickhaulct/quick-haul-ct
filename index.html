@@ -1,3 +1,4 @@
+<!-- VERSION 5 - FIXED -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -484,7 +485,7 @@
             <div class="upload-icon">📷</div>
             <div class="upload-text">Click to add photos of your items</div>
             <div class="upload-sub">JPG, PNG, HEIC — up to 5 images</div>
-            <input type="file" id="photoInput" accept="image/*" multiple style="display:none" onchange="handleFiles(this.files)"/>
+            <input type="file" id="photoInput" accept="image/*" multiple style="display:none"/>
           </div>
           <div id="previewRow" style="display:none; margin-top:12px; flex-wrap:wrap; gap:8px;"></div>
         </div>
@@ -586,6 +587,11 @@
       document.getElementById('previewRow').style.display = 'none';
     }
   }
+
+  /* Wire up the file input via JS instead of inline onchange */
+  document.getElementById('photoInput').addEventListener('change', function() {
+    handleFiles(this.files);
+  });
 
   var uploadZone = document.getElementById('uploadZone');
   uploadZone.addEventListener('dragover', function(e) {
